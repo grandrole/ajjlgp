@@ -1,0 +1,47 @@
+[General]
+SyntaxVersion=2
+BeginHotkey=121
+BeginHotkeyMod=2
+PauseHotkey=0
+PauseHotkeyMod=0
+StopHotkey=123
+StopHotkeyMod=2
+RunOnce=1
+EnableWindow=
+MacroID=19395024-6cb5-421d-8553-23d2df367edf
+Description=盘后ENE选股_自动备份
+Enable=1
+AutoRun=0
+[Repeat]
+Type=0
+Number=1
+[SetupUI]
+Type=2
+QUI=
+[Relative]
+SetupOCXFile=
+[Comment]
+
+[Script]
+LogStart "d:\gupiao\log\ENE下轨.log"
+
+//返回值 = Lib.长城证券智达信.exportJiaoGeDan("2015-12-01","")
+返回值 = Lib.长城证券智达信.getWeiTuoStatus("300310","买入")
+
+/*
+
+num = Plugin.File.ReadINI("Ths", "loopNum", "d:\gupiao\data\Config.ini")
+no = CInt(num)
+TracePrint "当前处理股票指针：" & num
+If no = 0 Then 
+	If Plugin.File.IsFileExist("d:\gupiao\data\ENE下轨.json") Then 
+		Call Lib.公用函数.删除文件("d:\gupiao\data\ENE下轨.json")
+	End If
+End If
+
+
+Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\basic\正常股票.txt","到达ENE下轨", no)
+*/
+LogStop 
+
+//Plugin.Sys.ExitOS(1)

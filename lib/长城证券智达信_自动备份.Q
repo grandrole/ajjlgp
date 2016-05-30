@@ -1,0 +1,465 @@
+[General]
+SyntaxVersion=2
+BeginHotkey=121
+BeginHotkeyMod=0
+PauseHotkey=0
+PauseHotkeyMod=0
+StopHotkey=123
+StopHotkeyMod=0
+RunOnce=1
+EnableWindow=
+MacroID=f230dc7d-d860-4fe4-9625-489b4fd1ee5f
+Description=长城证券智达信_自动备份
+Enable=1
+AutoRun=0
+[Repeat]
+Type=0
+Number=1
+[SetupUI]
+Type=2
+QUI=
+[Relative]
+SetupOCXFile=
+[Comment]
+
+[Script]
+//请在下面写上您的子程序或函数
+//写完保存后，在任一命令库上点击右键并选择“刷新”即可
+/*
+买入股票 
+返回值： 
+	1		提交成功
+	-1		没有启动股票软件
+	-2		没有取得最大购买数量
+	-3		最大购买数量为空
+	-4		购买数量小于1手
+	-5		没有取得股票购买价格
+*/
+Function buyStock(stockCode)
+	T1 = 1000
+	For n= 1 to 3
+		tdzHwnd = Lib.公用函数.getHwnd("通达信网上交易")
+		If tdzHwnd > 0 Then 
+			Exit For
+		End If
+		Plugin.Msg.Tips "请启动股票交易软件"
+		Delay 3000
+	Next
+	
+	If tdxHwnd < 0 Then 
+		buyStock = -1 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	//点击买入菜单
+	Call Lib.公用函数.MouseClick(241,57)
+	Delay T1
+	
+	MoveTo 291, 110
+	HwndStockCode = Plugin.Window.MousePoint()
+	Call Plugin.Window.SendString(HwndStockCode, stockCode)	//输入股票代码
+	Delay T1
+	//MessageBox "input stock count:" & stockCode & "," & Hwnd_B1
+	
+	//获得最大可买股票的数量
+	MoveTo 348,175
+	HwndMaxCount = Plugin.Window.MousePoint()
+	txtMaxCount = Plugin.Window.GetTextEx(HwndMaxCount, 1)
+	If txtMaxCount = "" Then 
+		buyStock = -2 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	If txtMaxCount = "" Then 
+		buyStock = -3 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+
+	maxCount = CDbl(txtMaxCount)
+	//MessageBox "MaxCount=" & maxCount	
+	If maxCount < 100 Then 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		buyStock = -4 
+		Exit Function
+	End If
+
+	
+	//获得买入的价格
+	MoveTo 321, 135
+	HwndPrice = Plugin.Window.MousePoint()
+	txtPrice = Plugin.Window.GetTextEx(HwndPrice, 1)
+	//MessageBox "价格:" & txtPrice
+
+	//计算买入数量
+	If txtPrice = "" Then 
+		buyStock = -5
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	price = CDbl(txtPrice)
+	count = int(5000 / price / 100)
+	If count <= 0 Then 
+		count = 1
+	End If
+	count = count * 100
+	
+	//输入购买数量
+	Call Lib.公用函数.MouseClick(307, 205)
+	Delay T1
+	HwndCount = Plugin.Window.MousePoint()
+	//MessageBox "数量指针：" & HwndCount
+	Call Plugin.Window.SendString(HwndCount, count)
+	Delay T1
+	
+	//点击“买入下单"
+	Call Lib.公用函数.MouseClick(373,232)
+	Delay T1
+
+	// 交易确定--------//  可以取消确定步骤，在交易软件内设置！！！
+	Hwnd_B4 = Plugin.Window.Find("#32770", "买入交易确认")
+	//Hwnd_B41 = Plugin.Window.FindEx(Hwnd_B4, 0, "Button", "取消")
+	Hwnd_B41 = Plugin.Window.FindEx(Hwnd_B4, 0, "Button", "买入确认")
+	Delay T1
+	Call Plugin.Bkgnd.LeftClick(Hwnd_B41, 40, 10)
+	// 交易确定------
+		
+	Delay T1
+	Hwnd_B7 = Plugin.Window.Find("#32770", "提示") 
+	Hwnd_B71 = Plugin.Window.FindEx(Hwnd_B7, 0, "Button", "确认")
+	//Delay T1
+	Call Plugin.Bkgnd.LeftClick(Hwnd_B71, 10, 10) //确认提示信息
+	Delay T1
+	
+	buyStock = 1
+	dispStr = "成功购买" & stockCode & " 数量：" & count & " 价格：" & txtPrice 
+	Plugin.Msg.Tips dispStr
+	TracePrint dispStr
+	
+	//点击持仓
+	Call Lib.公用函数.MouseClick(415,50)
+End Function
+
+
+/*
+卖出股票 
+返回值： 
+	1		提交成功
+	-1		没有启动股票软件
+	-2		没有取得卖出价格
+	-3		没有获得最大开卖数量
+	-4		最大可卖数量小于1手		
+*/
+Function sellStock(stockCode)
+	T1 = 1000
+	tdxHwnd = getTdxHwnd()
+	
+	If tdxHwnd < 0 Then 
+		sellStock = -1 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	//点击买出菜单
+	Call Lib.公用函数.MouseClick(281,58)
+	Delay T1
+	
+	MoveTo 291, 110
+	HwndStockCode = Plugin.Window.MousePoint()
+	Call Plugin.Window.SendString(HwndStockCode, stockCode)	//输入股票代码
+	Delay T1
+	//MessageBox "input stock count:" & stockCode & "," & Hwnd_B1
+
+	//获得卖出的价格
+	MoveTo 306,136
+	HwndPrice = Plugin.Window.MousePoint()
+	txtPrice = Plugin.Window.GetTextEx(HwndPrice, 1)
+	//Plugin.Msg.Tips "价格:" & txtPrice
+
+	//获得卖出价格为空
+	If txtPrice = "" Then 
+		sellStock = -2
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	//获得最大可卖的数量
+	MoveTo 308,156
+	HwndMaxCount = Plugin.Window.MousePoint()
+	txtMaxCount = Plugin.Window.GetTextEx(HwndMaxCount, 1)
+	If txtMaxCount = "" Then 
+		sellStock = -3 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	//Plugin.Msg.Tips "最大可卖数量:" & txtMaxCount
+	
+	count = CDbl(txtMaxCount)
+	//最大可卖数量小于1手
+	If count < 100 Then 
+		sellStock = -4 
+		//点击持仓
+		Call Lib.公用函数.MouseClick(415,50)
+		Exit Function
+	End If
+	
+	//输入购买数量
+	Call Lib.公用函数.MouseClick(312,192)
+	Delay T1
+	HwndCount = Plugin.Window.MousePoint()
+	//MessageBox "数量指针：" & HwndCount
+	Call Plugin.Window.SendString(HwndCount, count)
+	Delay T1
+	
+	//点击“卖出下单"
+	Call Lib.公用函数.MouseClick(376,220)
+	Delay T1
+	
+	// 交易确定--------//  可以取消确定步骤，在交易软件内设置！！！
+	Hwnd_B4 = Plugin.Window.Find("#32770", "卖出交易确认")
+	//Hwnd_B41 = Plugin.Window.FindEx(Hwnd_B4, 0, "Button", "取消")
+	Hwnd_B41 = Plugin.Window.FindEx(Hwnd_B4, 0, "Button", "卖出确认")
+	//Delay T1
+	Call Plugin.Bkgnd.LeftClick(Hwnd_B41, 40, 10)
+	// 交易确定------
+		
+	Delay T1
+	Hwnd_B7 = Plugin.Window.Find("#32770", "提示") 
+	Hwnd_B71 = Plugin.Window.FindEx(Hwnd_B7, 0, "Button", "确认")
+	//Delay T1
+	Call Plugin.Bkgnd.LeftClick(Hwnd_B71, 40, 10) //确认提示信息
+	Delay T1
+
+	sellStock = 1
+	dispStr = "成功卖出" & stockCode & " 数量：" & count & " 价格：" & txtPrice 
+	Plugin.Msg.Tips dispStr
+	TracePrint dispStr
+	
+	//点击持仓
+	Call Lib.公用函数.MouseClick(415,50)
+End Function
+
+Function getMyStockListData
+	T1 = 1000
+	tdxHwnd = getTdxHwnd()
+	If tdxHwnd > 0 Then 
+		Call clickChiCangButton
+		//显示持仓股票列表
+		MoveTo 1167,185
+		hwndStockList = Plugin.Window.MousePoint()
+		MessageBox "hwndStockList=" & hwndStockList
+		Delay T1
+		//点击“cntl + C”，复制列表内容
+		Call Plugin.Bkgnd.KeyDown(hwndStockList, 17)
+		Call Plugin.Bkgnd.KeyPress(hwndStockList, 67)
+		Call Plugin.Bkgnd.KeyUp(hwndStockList, 17)
+		Delay T1
+		stockList = Plugin.Sys.GetCLB()
+		MessageBox "stockList="  & stockList
+
+
+	End If
+End Function
+
+Sub clickChiCangButton
+	T1 = 1000
+	//点击持仓
+	Call Lib.公用函数.MouseClick(415, 50)
+	Delay T1
+End Sub
+
+Function getTdxHwnd
+	tdzHwnd = -1
+	For n= 1 to 3
+		tdzHwnd = Lib.公用函数.getHwnd("通达信网上交易")
+		If tdzHwnd > 0 Then 
+			Exit For
+		End If
+		Plugin.Msg.Tips "请启动股票交易软件"
+		Delay 3000
+	Next
+	getTdxHwnd = tdzHwnd
+End Function
+
+Function exportJiaoGeDan(startDateStr,stopDateStr)
+	Hwnd = getTdxHwnd()
+	If Hwnd > 0 Then 
+	 	If isDate(startDateStr) Then 
+			startDate = Cdate(startDateStr)
+		Else 
+			startDate = Date
+	 	End If
+	 	If isDate(stopDateStr) Then 
+			stopDate = Cdate(stopDateStr)
+		Else 
+			stopDate = Date
+	 	End If
+	 	
+	 	If startDate > stopDate Then 
+	 		tmpDate = startDate
+	 		startDate = stopDate
+	 		stopDate = tmpDate
+	 	End If
+	 	
+	 	period = DateDiff("d", startDate, stopDate)
+	 	If period >= 60 Then 
+	 		startDate = DateAdd("d", -59, stopDate)
+	 	End If
+	 	
+		//点击交割单
+		Call Lib.公用函数.MouseClick(78, 343)
+		Delay 1000
+		
+		//输入开始日期
+		MoveTo 289, 86
+		Call inputDateItem(289,86, Year(startDate))
+		Call inputDateItem(312,88, Month(startDate))
+		Call inputDateItem(332,90, Day(startDate))
+		//输入结束日期
+		Call inputDateItem(446, 91, Year(stopDate))
+		Call inputDateItem(466, 87, Month(stopDate))
+		Call inputDateItem(482, 90, Day(stopDate))
+		
+		//点击查询
+		Call Lib.公用函数.MouseClick(1265, 89)
+		Delay 1000
+		
+		//点击输出
+		Call Lib.公用函数.MouseClick(1330,88)
+		Delay 1000
+		
+		Call outputToExcel("d:\gupiao\data\jiaogedan.xls")
+
+	Else 
+		//长城证券交易软件未启动
+		exportJiaoGeDan = -1
+	End If
+
+End Function
+
+Function exportToWeiTuo(filename)
+	Hwnd = Lib.长城证券智达信.getTdxHwnd()
+	If Hwnd < 0 Then 
+		//没有运行股票交易软件
+		exportToWeiTuo = -1 
+		Exit function
+	End If
+	
+	//点击当日委托
+	Call Lib.公用函数.MouseClick(98, 235)
+	Delay 1000
+	
+	//点击输出
+	Call Lib.公用函数.MouseClick(1330, 88)
+	Delay 1000
+	
+	//输出到文件d:\gupiao\data\weituo.xls
+	Call outputToExcel(filename)	
+End Function
+
+Function getWeiTuoStatus(stockCode, type)
+ 	weituoFile = "d:\gupiao\data\weituo.xls"
+	Call Lib.公用函数.删除文件(weituoFile)
+	Call exportToWeiTuo(weituoFile)
+	If Plugin.File.IsFileExist(weituoFile) Then 
+		Call Plugin.Office.OpenXls(weituoFile)
+		row = 2
+		TradeDate = Plugin.Office.ReadXls(1, row, 1)
+		While TradeDate <> ""
+			weituoTime = Plugin.Office.ReadXls(1, row, 2)
+			code = Plugin.Office.ReadXls(1, row, 3)
+			name = Plugin.Office.ReadXls(1, row, 4)
+			TradeType = Plugin.Office.ReadXls(1, row, 5)
+			price = Plugin.Office.ReadXls(1, row, 6)
+			count = Plugin.Office.ReadXls(1, row, 7)
+			status = Plugin.Office.ReadXls(1, row, 12)
+			MessageBox TradeDate & "," & TradeType & "," & code & "," & name & "," & price & "," & count & "," & status
+			TracePrint TradeDate & "," & TradeType & "," & code & "," & name & "," & price & "," & count & "," & status
+			If code = stockCode Then 
+				getWeiTuoStatus = status
+				Exit function
+			End If
+			row = row + 1
+			TradeDate = Plugin.Office.ReadXls(1, row, 1)
+		Wend
+		Call Plugin.Office.CloseXls()
+		getWeiTuoStatus = -2
+	End If
+
+End Function
+
+Function outputToExcel(filename)
+	
+	//选择输出到excel
+	Call Lib.公用函数.MouseClick(625, 413)
+	Delay 1000
+
+	//输入文件名
+	Call Lib.公用函数.MouseClick(927, 434)
+	KeyPress "BackSpace", 50
+	Delay 1000
+	sayString(filename)
+	Delay 1000
+		
+	//点击确定
+	Call Lib.公用函数.MouseClick(859,518)
+
+End Function
+
+Function inputDateItem(x, y, num)
+	Call Lib.公用函数.MouseClick(x,y)
+	str = CInt(num)
+	If num < 10 Then 
+		str = "0" & str
+	End If
+	Call Lib.公用函数.InputKeyboardCodeNoEnter(str)
+	Delay 500
+End Function
+
+Function getDateStr(DateVal)
+	monthStr = Month(DateVal)
+	If monthStr < 10 Then 
+		monthStr = "0" & monthStr
+	End If
+	dayStr = Day(DateVal)
+	If dayStr < 10 Then 
+		dayStr = "0" & dayStr
+	End If
+	
+	getDateStr = Year(DateVal) & "-" & monthStr & "-" & dayStr
+	MessageBox getDateStr
+End Function
+
+Sub readJiaoGeDan
+	Call Plugin.Office.OpenXls("D:\gupiao\data\jgd.xls")
+	row = 2
+	TradeDate = Plugin.Office.ReadXls(1, row, 1)
+	While TradeDate <> ""
+		TradeType = Plugin.Office.ReadXls(1, row, 2)
+		code = Plugin.Office.ReadXls(1, row, 3)
+		name = Plugin.Office.ReadXls(1, row, 4)
+		price = Plugin.Office.ReadXls(1, row, 5)
+		count = Plugin.Office.ReadXls(1, row, 6)
+		yongjin = Plugin.Office.ReadXls(1, row, 11)
+		yinhuashui = Plugin.Office.ReadXls(1, row, 12)
+		guohufei = Plugin.Office.ReadXls(1, row, 13)
+		jiesuanfei = Plugin.Office.ReadXls(1, row, 14)
+		fujiafei = Plugin.Office.ReadXls(1, row, 15)
+		fee = yongjin + yinhuashui + guohufei + jiesuanfei + fujiafei
+		MessageBox TradeDate & "," & TradeType & "," & code & "," & name & "," & price & "," & count & "," & fee
+		TracePrint TradeDate & "," & TradeType & "," & code & "," & name & "," & price & "," & count & "," & fee
+		row = row + 1
+	Wend
+	Call Plugin.Office.CloseXls()
+End Sub

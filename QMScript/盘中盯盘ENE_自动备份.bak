@@ -1,0 +1,206 @@
+[General]
+SyntaxVersion=2
+BeginHotkey=121
+BeginHotkeyMod=0
+PauseHotkey=0
+PauseHotkeyMod=0
+StopHotkey=123
+StopHotkeyMod=0
+RunOnce=1
+EnableWindow=
+MacroID=dfd6f677-c115-4a1d-84a3-17c1144464e6
+Description=盘中盯盘ENE_自动备份_自动备份
+Enable=0
+AutoRun=0
+[Repeat]
+Type=0
+Number=1
+[SetupUI]
+Type=2
+QUI=
+[Relative]
+SetupOCXFile=
+[Comment]
+
+[Script]
+LogStart "d:\gupiao\log\盘中ENE盯盘.log"
+
+moningStartTime = TimeValue("9:30:00")
+moningStopTime = TimeValue("11:30:00")
+afternoonStartTime = TimeValue("13:00:00")
+afternoonStopTime = TimeValue("15:00:00")
+
+Dim dt
+
+/*
+	程序运行状态： 
+		0:  ready 启动程序
+		1:  start 开始
+		2:  Stop 结束
+*/
+
+
+status = 0
+Do
+	dt = Time
+	ret1 = ret2 = ret3 = ret4 = 0
+	ret1 = DateDiff("s", dt, moningStartTime)
+	Delay 1000
+	If ret1 < 0 Then 
+	 	//上午已经开市
+		ret3 = DateDiff("s", dt, moningStopTime)
+		Delay 1000
+		If ret3 < 0 Then 
+			//上午已经休市
+			ret2 = DateDiff("s", dt, afternoonStartTime)
+			Delay 1000
+			If ret2 < 0 Then 
+				//下午已开市
+				ret4 = DateDiff("s", dt, afternoonStopTime)
+				Delay 1000
+				If ret4 < 0 Then 
+					//下午已休市
+					status = 2
+				Else 
+					//下午正在交易
+					status = 1
+				End If
+			Else 
+				//下午未开市
+				status = 0
+			End If
+		Else 
+			//上午正在交易
+			status = 1
+		End If
+	Else 
+		//上午未开市
+		status = 0
+	End If
+	
+	//在非交易时间测试程序使用	
+	//status = 1
+	Select Case status
+		Case 0
+			If ret1 > 0 Then 
+				Plugin.Msg.Tips "离上午开市时间还差" & ret1 \ 60 & "分钟"
+				Delay ret1 * 60 * 1000
+			Else
+				If ret2 > 0 Then 
+					Plugin.Msg.Tips "离下午开市时间还差" & ret2 \ 60 & "分钟"
+					Delay ret2 * 60 * 1000
+				End If
+			End If
+			
+		Case 1
+			//初始化系统
+			thsHwnd = Lib.同花顺.getThsHwnd()
+			If thsHwnd < 0 Then 
+				MessageBox "启动同花顺程序失败，请退出系统，重新运行"
+				EndScript
+			End If
+
+			//盘中盯盘
+			Call Lib.公用函数.删除文件("d:\gupiao\data\删除股票.json")
+
+			//查找持仓股票的卖点
+			Call Lib.公用函数.删除文件("d:\gupiao\data\高抛.json")
+			Call Lib.公用函数.删除文件("d:\gupiao\data\ENE上轨.json")
+			Call Lib.公用函数.删除文件("d:\gupiao\data\5分钟空头.json")
+			
+			Plugin.Msg.Tips "查找持仓股票的卖点......"
+   			Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\basic\持仓.txt","到达ENE上轨",0)
+			ret1 = Plugin.File.IsFileExist("d:\gupiao\data\ENE上轨.json")
+			If ret1 = true Then 
+				Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\ENE上轨.json","5分钟空头排列",0)	
+				ret2 = Plugin.File.IsFileExist("d:\gupiao\data\5分钟空头.json")
+				If ret2 = True Then 
+					Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\5分钟空头.json","高抛",0)	
+				End If
+			End If
+	    	
+			//找买点
+			Call Lib.公用函数.删除文件("d:\gupiao\data\低吸.json")
+			//Call Lib.公用函数.删除文件("d:\gupiao\data\ENE下轨.json")
+			Call Lib.公用函数.删除文件("d:\gupiao\data\ENE中轨.json")
+			Call Lib.公用函数.删除文件("d:\gupiao\data\5分钟多头.json")
+			Plugin.Msg.Tips "查找持续买入股票买点 ......"
+			Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\basic\持续持有的股票.txt","到达ENE中轨",0)
+			ret1 = Plugin.File.IsFileExist("d:\gupiao\data\ENE中轨.json")
+			If ret1 = true Then 
+				Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\ENE中轨.json","5分钟多头排列",0)	
+			End If
+			
+			Plugin.Msg.Tips "查找自选股买点......"
+			//查找自选股的买点
+			//Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\basic\自选股票.txt","到达ENE下轨",0)
+			ret2 = Plugin.File.IsFileExist("d:\gupiao\data\ENE下轨.json")
+			If ret2 = true Then 
+				Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\ENE下轨.json","5分钟多头排列",0)	
+			End If	
+			Delay 1000
+			ret3 = Plugin.File.IsFileExist("d:\gupiao\data\5分钟多头.json")
+			If ret3 = True Then 
+				Call Lib.框架函数1.loopProcessStockFile("d:\gupiao\data\5分钟多头.json","低吸",0)	
+			End If
+
+			ret4 = Plugin.File.IsFileExist("d:\gupiao\data\删除股票.json")
+			If ret4 = True Then 
+				Call Lib.框架函数1.loopProcessStockFile("d:\gupiao\data\删除股票.json","停牌",0)
+			End If
+						
+			//间隔5分钟
+			interVal = Minute(Now) mod 5
+			If interVal >= 0 Then 
+				interVal = 5 - InterVal
+				Plugin.Msg.Tips "等待" & interVal & "分钟"
+				Delay interVal * 60 * 1000
+			End If
+	
+		Case 2
+			//MessageBox "本日股市已经结束,本程序停止运行"
+			level = Plugin.File.ReadINI("Ths", "loopNum", "d:\gupiao\data\Config.ini") 
+			num = Plugin.File.ReadINI("Ths", "loopNum", "d:\gupiao\data\Config.ini")
+			no = CInt(num)
+			TracePrint "当前处理股票指针：" & num
+			If no = 0 Then 
+			 	Select Case level
+			 		Case "查找复牌股票"
+			 			If Plugin.File.IsFileExist("d:\gupiao\data\复牌股票.json") Then 
+							Call Lib.公用函数.删除文件("d:\gupiao\data\复牌股票.json")
+						End If				
+			 		Case "到达ENE下轨"
+			 			If Plugin.File.IsFileExist("d:\gupiao\data\ENE下轨.json") Then 
+							Call Lib.公用函数.删除文件("d:\gupiao\data\ENE下轨.json")
+						End If
+			 	End Select
+			End If
+			thsHwnd = Lib.同花顺.getThsHwnd()
+			If thsHwnd > 0 Then 
+				Select Case level
+					Case "查找复牌股票"
+						Call Lib.框架函数1.loopProcessStockFile("d:\gupiao\data\basic\停牌股票.txt","是否复牌",no)
+						ret5 = Plugin.File.IsFileExist("d:\gupiao\data\复牌股票.json")
+						If ret5 = True Then 
+							Call Plugin.File.WriteINI("ths", "level", "股票复牌", ".d:\gupiao\data\Config.ini")
+							Call Plugin.File.WriteINI("ths", "loopNum", "0", ".d:\gupiao\data\Config.ini")
+						Else 
+							Call Plugin.File.WriteINI("ths", "level", "到达ENE下轨", ".d:\gupiao\data\Config.ini")
+							Call Plugin.File.WriteINI("ths", "loopNum", "0", ".d:\gupiao\data\Config.ini")						
+						End If
+					Case "股票复牌"
+						Call Lib.框架函数1.loopProcessStockFile("d:\gupiao\data\复牌股票.json","复牌",no)
+						Call Plugin.File.WriteINI("ths", "level", "到达ENE下轨", "d:\gupiao\data\Config.ini")
+						call Plugin.File.WriteINI("ths", "loopNum", "0", "d:\gupiao\data\Config.ini")	
+					Case "到达ENE下轨"
+						Call Lib.框架函数1.loopProcessTHSStockFile("d:\gupiao\data\basic\正常股票.txt", "到达ENE下轨", 0)
+				End Select
+			End If
+			Exit Do
+	End Select
+Loop
+
+LogStop 
+Plugin.Msg.Tips "股市结束，正在关机 ......"
+//Call Plugin.Sys.ExitOS(1)
+EndScript
